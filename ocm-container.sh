@@ -81,36 +81,6 @@ fi
 
 source ${OCM_CONTAINER_CONFIGFILE}
 
-### SSH Agent Mounting
-operating_system=`uname`
-
-if [[ -z ${SSH_AUTH_SOCK} ]] ; then
-  echo "SSH_AUTH_SOCK is not set.  Are you trying to run ocm-container remotely?  Hint: Run 'eval \$(ssh-agent)' first."
-  exit 1
-fi
-
-SSH_AGENT_MOUNT="-v ${SSH_AUTH_SOCK}:/tmp/ssh.sock:ro"
-SSH_AUTH_SOCK_ENV="-e \"SSH_AUTH_SOCK=/tmp/ssh.sock\""
-
-### Mount ssh sockets dir used for ssh connection multiplexing
-SSH_SOCKETS_DIR=${HOME}/.ssh/sockets
-if [ -d "${SSH_SOCKETS_DIR}" ] && [ "${DISABLE_SSH_MULTIPLEXING}" != "true" ]
-then
- SSH_SOCKETS_MOUNT="-v ${SSH_SOCKETS_DIR}:/root/.ssh/sockets"
-fi
-
-if [[ "$CONTAINER_SUBSYS" != "podman" ]] && [[  "$operating_system" == "Darwin" ]]
-then
-  SSH_AGENT_MOUNT="--mount type=bind,src=/run/host-services/ssh-auth.sock,target=/tmp/ssh.sock,readonly"
-elif [[ "$CONTAINER_SUBSYS" == podman ]] && [[ "$operating_system" == "Darwin" ]]
-then
-  agent_location=$(podman machine ssh 'ls /private/tmp | grep com.apple.launchd')
-  SSH_AGENT_MOUNT="-v /private/tmp/$agent_location:/tmp/ssh:ro"
-  SSH_AUTH_SOCK_ENV="-e \"SSH_AUTH_SOCK=/tmp/ssh/Listeners\""
-  SSH_SOCKETS_MOUNT="--mount type=tmpfs,destination=/root/.ssh/sockets"
-fi
-
-
 ### AWS token pull
 if [[ -f "${HOME}/.aws/credentials" ]]
 then
@@ -242,15 +212,11 @@ CONTAINER=$(${CONTAINER_SUBSYS} create $TTY --rm --privileged \
 ${JIRATOKENCONFIG} \
 ${INITIAL_CLUSTER_LOGIN} \
 -v ${CONFIG_DIR}:/root/.config/ocm-container:ro \
--v ${HOME}/.ssh:/root/.ssh:ro \
 ${GOOGLECLOUDFILEMOUNT} \
 ${JIRAFILEMOUNT} \
 ${PAGERDUTYFILEMOUNT} \
 ${OSDCTL_CONFIG_MOUNT} \
 ${AWSFILEMOUNT} \
-${SSH_AGENT_MOUNT} \
-${SSH_SOCKETS_MOUNT} \
-${SSH_AUTH_SOCK_ENV} \
 ${OPS_UTILS_DIR_MOUNT} \
 ${SCRATCH_DIR_MOUNT} \
 ${PORT_MAP_OPTS} \
