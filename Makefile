@@ -52,8 +52,15 @@ init:
 	bash init.sh
 
 .PHONY: build
+build: build-image-amd64
+
+.PHONY: build-image-amd64
 build:
-	@${CONTAINER_ENGINE} build $(BUILD_ARGS) -t $(IMAGE_NAME):$(TAG) .
+	time @${CONTAINER_ENGINE} build $(BUILD_ARGS) --platform=linux/amd64 -t $(IMAGE_NAME):$(TAG) .
+
+.PHONY: build-image-arm64
+build:
+	time @${CONTAINER_ENGINE} build $(BUILD_ARGS) --platform=linux/arm64 -t $(IMAGE_NAME):$(TAG) .
 
 .PHONY: registry-login
 registry-login:
@@ -119,11 +126,11 @@ coverage:
 	hack/codecov.sh
 
 .PHONY: lint
-lint: 
+lint:
 	$(GOPATH)/bin/golangci-lint run --timeout 5m
 
 .PHONY: release
-release: 
+release:
 	goreleaser release --clean
 
 .PHONY: build-snapshot
