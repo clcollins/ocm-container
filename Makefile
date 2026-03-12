@@ -254,6 +254,7 @@ endef
 
 # Build targets
 .PHONY: build-all build-micro build-minimal build-full build-full-local build
+.PHONY: build-micro-local build-minimal-local build-all-local
 build-all: build-micro build-minimal build-full
 
 build-micro: check
@@ -265,8 +266,17 @@ build-minimal: check
 build-full: check
 	@$(call build_target,$(IMAGE_NAME),$(ARCHITECTURE))
 
+# Local-only builds (no manifest, suitable for scanning)
+build-micro-local: check
+	@$(call build_local_target,$(IMAGE_NAME)-micro,$(ARCHITECTURE))
+
+build-minimal-local: check
+	@$(call build_local_target,$(IMAGE_NAME)-minimal,$(ARCHITECTURE))
+
 build-full-local: check
 	@$(call build_local_target,$(IMAGE_NAME),$(ARCHITECTURE))
+
+build-all-local: build-micro-local build-minimal-local build-full-local
 
 # The default build target is for human use, outside of the CI/CD pipeline
 build: build-full-local
@@ -419,5 +429,12 @@ fmt:
 .PHONY: clean
 clean:
 	rm -rf \
-		build/*
+		build/* \
 		dist/*
+
+####################
+# Vulnerability Scanning
+####################
+
+# Import vulnerability scanning targets (Clair)
+include utils/clair/clair.mk

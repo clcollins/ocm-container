@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: clair-scanner
+  labels:
+    app: clair-scanner
+spec:
+  restartPolicy: Never
+  hostNetwork: false
+  containers:
+
+  # PostgreSQL Database
+  - name: clair-postgres
+    image: docker.io/library/postgres:13
+    env:
+    - name: POSTGRES_DB
+      value: clair
+    - name: POSTGRES_USER
+      value: clair
+    - name: POSTGRES_PASSWORD
+      value: clair
+    # No host port mapping - PostgreSQL communication stays in-pod
+
+  # Temporary Registry
+  - name: clair-registry
+    image: docker.io/library/registry:2
+    ports:
+    - containerPort: 5000
+      hostIP: 127.0.0.1
+      hostPort: 5000
+    # Only expose port 5000 to localhost for pushing images
+    # Port 5555 mapping removed - use 5000 directly
+
+  # Clair Service
+  - name: clair-service
+    image: quay.io/projectquay/clair:4.9.0
+    args:
+    - "-conf"
+    - "/etc/clair/config.yaml"
+    volumeMounts:
+    - name: clair-config
+      mountPath: /etc/clair
+      readOnly: true
+    ports:
+    - containerPort: 6060
+      hostIP: 127.0.0.1
+      hostPort: 6060
+    # Only expose Clair API port to localhost for clairctl access
+    # Port 6061 (introspection) stays in-pod only
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 6061
+      initialDelaySeconds: 90
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: 6061
+      initialDelaySeconds: 90
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 120  # 20 minutes max (120 * 10s)
+    # Wait for PostgreSQL to be ready before starting Clair
+    # This prevents the connection refused panic
+    command:
+    - /bin/bash
+    - -c
+    - |
+      echo "Waiting for PostgreSQL to be ready..."
+      until timeout 1 bash -c 'cat < /dev/null > /dev/tcp/localhost/5432' 2>/dev/null; do
+        echo "  PostgreSQL not ready, waiting..."
+        sleep 2
+      done
+      echo "PostgreSQL is ready, starting Clair..."
+      exec /usr/bin/clair -conf /etc/clair/config.yaml
+
+  volumes:
+  - name: clair-config
+    hostPath:
+      path: PWD_PLACEHOLDER/utils/clair
+      type: Directory

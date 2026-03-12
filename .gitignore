@@ -8,6 +8,9 @@
 dist/
 build/
 
+# Security scan results
+scan-results/
+
 env.source
 .github/*
 
