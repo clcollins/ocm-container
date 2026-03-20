@@ -29,18 +29,10 @@ spec:
       hostIP: 127.0.0.1
       hostPort: 5000
     # Only expose port 5000 to localhost for pushing images
-    # Port 5555 mapping removed - use 5000 directly
 
   # Clair Service
   - name: clair-service
     image: quay.io/projectquay/clair:4.9.0
-    args:
-    - "-conf"
-    - "/etc/clair/config.yaml"
-    volumeMounts:
-    - name: clair-config
-      mountPath: /etc/clair
-      readOnly: true
     ports:
     - containerPort: 6060
       hostIP: 127.0.0.1
@@ -63,8 +55,8 @@ spec:
       periodSeconds: 10
       timeoutSeconds: 5
       failureThreshold: 120  # 20 minutes max (120 * 10s)
-    # Wait for PostgreSQL to be ready before starting Clair
-    # This prevents the connection refused panic
+    # Wait for PostgreSQL, write config inline (avoids SELinux hostPath issues),
+    # then start Clair
     command:
     - /bin/bash
     - -c
@@ -75,10 +67,5 @@ spec:
         sleep 2
       done
       echo "PostgreSQL is ready, starting Clair..."
-      exec /usr/bin/clair -conf /etc/clair/config.yaml
-
-  volumes:
-  - name: clair-config
-    hostPath:
-      path: PWD_PLACEHOLDER/utils/clair
-      type: Directory
+      echo 'CLAIR_CONFIG_BASE64' | base64 -d > /tmp/clair-config.yaml
+      exec /usr/bin/clair -conf /tmp/clair-config.yaml
